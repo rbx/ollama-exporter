@@ -1,0 +1,59 @@
+{
+    "id": null,
+    "title": "Ollama Metrics Dashboard",
+    "panels": [
+      {
+        "title": "Total Requests Per Model",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "sum by (model) (ollama_requests_total)",
+            "format": "time_series"
+          }
+        ]
+      },
+      {
+        "title": "Response Time (Seconds)",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.95, sum(rate(ollama_response_seconds_bucket[5m])) by (le, model))",
+            "format": "time_series"
+          }
+        ]
+      },
+      {
+        "title": "Tokens Generated Per Model",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "sum by (model) (rate(ollama_tokens_generated_total[5m]))",
+            "format": "time_series"
+          }
+        ]
+      },
+      {
+        "title": "Evaluation Steps",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "sum by (model) (rate(ollama_eval_total[5m]))",
+            "format": "time_series"
+          }
+        ]
+      },
+      {
+        "title": "Model Load Time (Seconds)",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.95, sum(rate(ollama_load_time_seconds_bucket[5m])) by (le, model))",
+            "format": "time_series"
+          }
+        ]
+      }
+    ],
+    "schemaVersion": 27,
+    "version": 1,
+    "refresh": "5s"
+}
