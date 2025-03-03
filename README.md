@@ -63,12 +63,10 @@ docker restart <prometheus-container-name>
 
 ## Grafana Integration
 1. Open **Grafana**.
-2. Go to **Explore**, select **Prometheus** as the data source.
-3. Query example:
-   ```
-   ollama_requests_total
-   ```
-4. Create a new dashboard and add visualizations for these metrics.
+2. Go to **Dashboards → Import**.
+3. Click **Upload JSON file** and select `dashboard.json` from the project directory.
+4. Select your **Prometheus data source**.
+5. Click **Import** to add the dashboard.
 
 ## API Endpoints
 | Endpoint | Method | Description |
@@ -78,4 +76,4 @@ docker restart <prometheus-container-name>
 | `/api/tags` | GET | Lists available models |
 
 ## License
-You don't need one.
+There is no spoon.
