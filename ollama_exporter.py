@@ -38,29 +38,22 @@ def extract_and_record_metrics(response_data, model):
     if total_duration > 0:
         total_duration_seconds = total_duration / 1_000_000_000
         OLLAMA_TOTAL_DURATION.labels(model=model).observe(total_duration_seconds)
-        print(f"Total duration for model {model}: {total_duration_seconds} seconds")
     if load_duration > 0:
         load_duration_seconds = load_duration / 1_000_000_000
         OLLAMA_LOAD_DURATION.labels(model=model).observe(load_duration_seconds)
-        print(f"Load duration for model {model}: {load_duration_seconds} seconds")
     if prompt_eval_duration > 0:
         prompt_eval_time_seconds = prompt_eval_duration / 1_000_000_000
         OLLAMA_PROMPT_EVAL_DURATION.labels(model=model).observe(prompt_eval_time_seconds)
-        print(f"Prompt eval duration for model {model}: {prompt_eval_time_seconds} seconds")
     if prompt_eval_count > 0:
         OLLAMA_PROMPT_EVAL_COUNT.labels(model=model).inc(prompt_eval_count)
-        print(f"Prompt eval count for model {model}: {prompt_eval_count} tokens")
     if eval_duration > 0:
         eval_duration_seconds = eval_duration / 1_000_000_000
         OLLAMA_EVAL_DURATION.labels(model=model).observe(eval_duration_seconds)
-        print(f"Eval duration for model {model}: {eval_duration_seconds} seconds")
     if eval_count > 0:
         OLLAMA_EVAL_COUNT.labels(model=model).inc(eval_count)
-        print(f"Eval count for model {model}: {eval_count} tokens")
     if eval_duration > 0 and eval_count > 0:
         tps = eval_count / eval_duration * 1_000_000_000
         OLLAMA_TOKENS_PER_SECOND.labels(model=model).observe(tps)
-        print(f"Tokens per second for model {model}: {tps} tokens/second")
 
 @app.get("/metrics")
 def metrics():
@@ -70,7 +63,6 @@ def metrics():
 @app.post("/api/chat")
 async def chat_with_metrics(request: Request):
     """Handle chat requests with streaming support and metrics extraction."""
-    print("Received chat request")
     body = await request.json()
     model = body.get("model", "unknown")
     is_streaming = body.get("stream", False)
@@ -83,8 +75,6 @@ async def chat_with_metrics(request: Request):
     OLLAMA_CHAT_REQUEST_COUNT.labels(model=model).inc()
 
     if is_streaming:
-        print(f"Streaming chat request for model: {model}")
-
         async def generate_stream():
             async with httpx.AsyncClient(timeout=httpx.Timeout(900.0, read=900.0)) as client:
                 async with client.stream("POST", f"{OLLAMA_HOST}/api/chat", headers=headers, json=body, params=request.query_params) as response:
@@ -120,8 +110,6 @@ async def chat_with_metrics(request: Request):
 
         return StreamingResponse(generate_stream(), media_type="application/json")
     else:
-        print(f"Non-streaming chat request for model: {model}")
-
         async with httpx.AsyncClient(timeout=httpx.Timeout(900.0, read=900.0)) as client:
             response = await client.post(f"{OLLAMA_HOST}/api/chat", headers=headers, json=body, params=request.query_params)
 
