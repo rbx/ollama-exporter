@@ -65,6 +65,7 @@ async def chat_with_metrics(request: Request):
     """Handle chat requests with streaming support and metrics extraction."""
     body = await request.json()
     model = body.get("model", "unknown")
+    # print(json.dumps(body, indent=4))
     is_streaming = body.get("stream", False)
 
     headers = dict(request.headers)
