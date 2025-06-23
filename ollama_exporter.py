@@ -1,6 +1,7 @@
 import os
 import httpx
 import json
+import logging
 from fastapi import FastAPI, Request, Response
 from fastapi.responses import StreamingResponse
 
@@ -9,6 +10,11 @@ from prometheus_client import Counter, Histogram, generate_latest, CONTENT_TYPE_
 
 # Configurable Ollama host (via env variable or defaults to localhost)
 OLLAMA_HOST = os.getenv("OLLAMA_HOST", "http://localhost:11434")
+
+logging.basicConfig()
+logger = logging.getLogger(__name__)
+LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO").upper()
+logger.setLevel(getattr(logging, LOG_LEVEL, logging.INFO))
 
 app = FastAPI()
 
@@ -38,22 +44,29 @@ def extract_and_record_metrics(response_data, model):
     if total_duration > 0:
         total_duration_seconds = total_duration / 1_000_000_000
         OLLAMA_TOTAL_DURATION.labels(model=model).observe(total_duration_seconds)
+        logger.debug(f"Model: {model}, Total Duration: {total_duration_seconds:.2f} seconds")
     if load_duration > 0:
         load_duration_seconds = load_duration / 1_000_000_000
         OLLAMA_LOAD_DURATION.labels(model=model).observe(load_duration_seconds)
+        logger.debug(f"Model: {model}, Load Duration: {load_duration_seconds:.2f} seconds")
     if prompt_eval_duration > 0:
         prompt_eval_time_seconds = prompt_eval_duration / 1_000_000_000
         OLLAMA_PROMPT_EVAL_DURATION.labels(model=model).observe(prompt_eval_time_seconds)
+        logger.debug(f"Model: {model}, Prompt Eval Duration: {prompt_eval_time_seconds:.2f} seconds")
     if prompt_eval_count > 0:
         OLLAMA_PROMPT_EVAL_COUNT.labels(model=model).inc(prompt_eval_count)
+        logger.debug(f"Model: {model}, Prompt Eval Count: {prompt_eval_count}")
     if eval_duration > 0:
         eval_duration_seconds = eval_duration / 1_000_000_000
         OLLAMA_EVAL_DURATION.labels(model=model).observe(eval_duration_seconds)
+        logger.debug(f"Model: {model}, Eval Duration: {eval_duration_seconds:.2f} seconds")
     if eval_count > 0:
         OLLAMA_EVAL_COUNT.labels(model=model).inc(eval_count)
+        logger.debug(f"Model: {model}, Eval Count: {eval_count}")
     if eval_duration > 0 and eval_count > 0:
         tps = eval_count / eval_duration * 1_000_000_000
         OLLAMA_TOKENS_PER_SECOND.labels(model=model).observe(tps)
+        logger.debug(f"Model: {model}, Tokens per Second: {tps:.2f}")
 
 @app.get("/metrics")
 def metrics():
@@ -65,7 +78,7 @@ async def chat_with_metrics(request: Request):
     """Handle chat requests with streaming support and metrics extraction."""
     body = await request.json()
     model = body.get("model", "unknown")
-    # print(json.dumps(body, indent=4))
+    # logger.debug(f"Chat request body: {json.dumps(body, indent=4)}")
     is_streaming = body.get("stream", False)
 
     headers = dict(request.headers)
@@ -126,6 +139,7 @@ async def chat_with_metrics(request: Request):
 @app.api_route("/{path:path}", methods=["GET", "POST", "PUT", "DELETE", "PATCH", "HEAD", "OPTIONS"])
 async def simple_proxy(request: Request, path: str):
     """Simple pass-through proxy for all other endpoints."""
+    logger.debug(f"Proxying {request.method} request to /{path}")
     headers = dict(request.headers)
     headers.pop("host", None)
     headers.pop("content-length", None)
@@ -133,6 +147,7 @@ async def simple_proxy(request: Request, path: str):
     async with httpx.AsyncClient(timeout=httpx.Timeout(900.0, read=900.0)) as client:
         response = await client.request(method=request.method, url=f"{OLLAMA_HOST}/{path}", headers=headers, content=await request.body(), params=request.query_params)
 
+    logger.debug(f"Proxy response: {response.status_code} for {request.method} /{path}")
     return Response(content=response.content, status_code=response.status_code, headers=dict(response.headers))
 
 if __name__ == "__main__":
