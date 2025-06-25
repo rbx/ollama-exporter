@@ -20,12 +20,14 @@ app = FastAPI()
 
 OLLAMA_CHAT_REQUEST_COUNT = Counter("ollama_requests_total", "Total chat requests", ["model"])
 
-OLLAMA_TOTAL_DURATION = Histogram("ollama_response_seconds", "Total time spent for the response", ["model"])
-OLLAMA_LOAD_DURATION = Histogram("ollama_load_duration_seconds", "Time spent loading the model", ["model"])
+OLLAMA_TOTAL_DURATION =       Histogram("ollama_response_seconds", "Total time spent for the response", ["model"])
+OLLAMA_LOAD_DURATION =        Histogram("ollama_load_duration_seconds", "Time spent loading the model", ["model"])
 OLLAMA_PROMPT_EVAL_DURATION = Histogram("ollama_prompt_eval_duration_seconds", "Time spent evaluating prompt", ["model"])
+OLLAMA_EVAL_DURATION =        Histogram("ollama_eval_duration_seconds", "Time spent generating the response", ["model"])
+
 OLLAMA_PROMPT_EVAL_COUNT = Counter("ollama_tokens_processed_total", "Number of tokens in the prompt", ["model"])
-OLLAMA_EVAL_DURATION = Histogram("ollama_eval_duration_seconds", "Time spent generating the response", ["model"])
-OLLAMA_EVAL_COUNT = Counter("ollama_tokens_generated_total", "Number of tokens in the response", ["model"])
+OLLAMA_EVAL_COUNT =        Counter("ollama_tokens_generated_total", "Number of tokens in the response", ["model"])
+
 OLLAMA_TOKENS_PER_SECOND = Histogram("ollama_tokens_per_second", "Tokens generated per second", ["model"])
 
 def extract_and_record_metrics(response_data, model):
@@ -74,8 +76,9 @@ def metrics():
     return Response(generate_latest(), media_type=CONTENT_TYPE_LATEST)
 
 @app.post("/api/chat")
+@app.post("/api/generate")
 async def chat_with_metrics(request: Request):
-    """Handle chat requests with streaming support and metrics extraction."""
+    """Handle chat and generate requests with streaming support and metrics extraction."""
     body = await request.json()
     model = body.get("model", "unknown")
     # logger.debug(f"Chat request body: {json.dumps(body, indent=4)}")
@@ -90,8 +93,9 @@ async def chat_with_metrics(request: Request):
 
     if is_streaming:
         async def generate_stream():
+            endpoint = request.url.path  # /api/chat or /api/generate
             async with httpx.AsyncClient(timeout=httpx.Timeout(900.0, read=900.0)) as client:
-                async with client.stream("POST", f"{OLLAMA_HOST}/api/chat", headers=headers, json=body, params=request.query_params) as response:
+                async with client.stream("POST", f"{OLLAMA_HOST}{endpoint}", headers=headers, json=body, params=request.query_params) as response:
 
                     final_chunk_data = None
 
@@ -124,8 +128,9 @@ async def chat_with_metrics(request: Request):
 
         return StreamingResponse(generate_stream(), media_type="application/json")
     else:
+        endpoint = request.url.path  # /api/chat or /api/generate
         async with httpx.AsyncClient(timeout=httpx.Timeout(900.0, read=900.0)) as client:
-            response = await client.post(f"{OLLAMA_HOST}/api/chat", headers=headers, json=body, params=request.query_params)
+            response = await client.post(f"{OLLAMA_HOST}{endpoint}", headers=headers, json=body, params=request.query_params)
 
             if response.status_code == 200:
                 try:
